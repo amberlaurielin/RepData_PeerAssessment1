@@ -1,0 +1,117 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+    theme: united
+    toc: true
+---
+## Required packages
+```{r, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+library(ggplot2)
+library(plyr)
+library(mice)
+library(mice)
+library(VIM)
+library(lattice)
+library(lubridate)
+```
+
+
+## Loading and preprocessing the data
+```{r}
+temp <- tempfile()
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp)
+unzipped<-unz(temp, "activity.csv")
+data <- read.csv(unzipped)
+unlink(temp)
+str(data)
+```
+
+## What is mean total number of steps taken per day?
+```{r}
+
+total_steps_per_day<-aggregate(data[, 1], list(data$date), sum, na.rm=TRUE)
+str(total_steps_per_day)
+mean(total_steps_per_day$x)
+
+
+ggplot(total_steps_per_day, aes(x=x))+geom_histogram( alpha=0.5,bins = 50) +
+labs(title="Histogram of Total Steps Per Day", x="Total Steps per Day",
+    caption="Red dashed line for Mean Total Steps per Day, Green dashed line for Median Total Steps per Day")+
+  geom_vline(aes(xintercept = mean(x)),col='red',size=1,linetype="dashed")+
+  geom_vline(aes(xintercept = median(x)),col='green',size=1,linetype="dashed")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5, size = 20))
+mean(total_steps_per_day$x)
+median(total_steps_per_day$x)
+
+
+```
+
+
+## What is the average daily activity pattern?
+```{r}
+
+mean_steps_per_interval<-aggregate(data[, 1], list(data$interval), mean, na.rm=TRUE)
+str(mean_steps_per_interval)
+ggplot(mean_steps_per_interval, aes(x=Group.1,y=x))+
+    geom_line( size=1) +
+  labs(title="Line Plot of Total Steps Per Interval", x="Interval", y="Total steps")+
+   theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5, size = 20))
+mean(mean_steps_per_interval$x)
+median(mean_steps_per_interval$x)
+###Interval with most steps on average
+mean_steps_per_interval[which.max(mean_steps_per_interval$x),]$Group.1
+###Average number of steps for interval with maximum average
+mean_steps_per_interval[which.max(mean_steps_per_interval$x),]$x
+
+
+
+```
+
+## Imputing missing values
+### Using predictive mean matching, m=5 imputations
+```{r}
+
+md.pairs(data)
+mean(is.na(data))
+
+imputed_data <- mice(data, m = 5)
+imputed_data
+imputed_data2 <- complete(imputed_data, "long", inc = TRUE)
+
+mean(data$steps, na.rm=TRUE)
+median(data$steps, na.rm=TRUE)
+mean(imputed_data2$steps, na.rm=TRUE)
+median(imputed_data2$steps, na.rm=TRUE)
+
+total_steps_per_day_imputed<-aggregate(imputed_data2[, 3], list(imputed_data2$date), sum, na.rm=TRUE)
+str(total_steps_per_day_imputed)
+
+ggplot(total_steps_per_day_imputed, aes(x=x))+geom_histogram( alpha=0.5,bins = 50) +
+labs(title="Histogram of Total Steps Per Day", x="Total Steps per Day",
+    caption="Red dashed line for Mean Total Steps per Day, Green dashed line for Median Total Steps per Day")+
+  geom_vline(aes(xintercept = mean(x)),col='red',size=1,linetype="dashed")+
+  geom_vline(aes(xintercept = median(x)),col='green',size=1,linetype="dashed")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5, size = 20))
+mean(total_steps_per_day$x)
+median(total_steps_per_day$x)
+
+```
+## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+days<-wday(data$date, label = TRUE, abbr = TRUE)
+data2<-cbind(days,data)
+table(data2$days)
+data2$weekdays[days=='Mon'|days=='Tue'|days=='Wed'|days=='Thu'|days=='Fri']<-"Weekdays"
+data2$weekdays[days=='Sun'|days=='Sat']<-"Weekend"
+data2$weekdays<-factor(data2$weekdays)
+mean_steps_per_interval_weekday_v_weekend<-aggregate(data=data2,steps~weekdays+interval, mean, na.rm=TRUE)
+xyplot(data=mean_steps_per_interval_weekday_v_weekend, steps~interval|weekdays,
+   main="Scatterplots of steps by interval: Comparing weekends and weekdays",
+   ylab="Steps", xlab="Interval", type = c("p", "g", "smooth"))
+
+```
